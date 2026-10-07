@@ -230,49 +230,21 @@ class HAFailOver():
                             self.find_the_current_and_next_hop_ip(route["next_hop"]["address"])
                             self.logger(f"Route update - current hop: {self.next_hop_vsi}, new hop: {self.update_next_hop_vsi}")
 
-                            # Update or create route based on zone
-                            if route["zone"]["name"] == self.vsi_local_az or not is_ingress_table:
-                                self.logger(f"Updating existing route in zone {route['zone']['name']}")
-                                # Update existing route
-                                route_patch = {
-                                    "advertise": route["advertise"],
-                                    "name": route["name"],
-                                    "next_hop": {"address": self.update_next_hop_vsi},
-                                    "priority": route["priority"]
-                                }
+                            route_patch = {
+                                "advertise": route["advertise"],
+                                "name": route["name"],
+                                "zone": {"name": self.vsi_local_az} if self.vsi_local_az else route["zone"],
+                                "next_hop": {"address": self.update_next_hop_vsi},
+                                "priority": route["priority"]
+                            }
 
-                                self.logger(f"Patching route {route['id']} with data: {route_patch}")
-                                self._make_api_request(
-                                    "PATCH",
-                                    f"/v1/vpcs/{self.vpc_id}/routing_tables/{table_id}/routes/{route['id']}?version={self.API_VERSION}&generation=2",
-                                    body=json.dumps(route_patch)
-                                )
-                                self.logger(f"Successfully updated route {route['id']} to use next hop {self.update_next_hop_vsi}")
-                            else:
-                                self.logger(f"Route is in different zone ({route['zone']['name']}), creating new route in zone {self.vsi_local_az}")
-                                # Delete and create new route
-                                self.logger(f"Deleting route {route['id']} from zone {route['zone']['name']}")
-                                self._make_api_request(
-                                    "DELETE",
-                                    f"/v1/vpcs/{self.vpc_id}/routing_tables/{table_id}/routes/{route['id']}?version={self.API_VERSION}&generation=2"
-                                )
-
-                                new_route = {
-                                    "destination": route["destination"],
-                                    "zone": {"name": self.vsi_local_az} if self.vsi_local_az else route["zone"],
-                                    "action": "deliver",
-                                    "next_hop": {"address": self.update_next_hop_vsi},
-                                    "name": route["name"],
-                                    "advertise": route["advertise"]
-                                }
-
-                                self.logger(f"Creating new route with data: {new_route}")
-                                self._make_api_request(
-                                    "POST",
-                                    f"/v1/vpcs/{self.vpc_id}/routing_tables/{table_id}/routes?version={self.API_VERSION}&generation=2",
-                                    body=json.dumps(new_route)
-                                )
-                                self.logger(f"Successfully created new route with next hop {self.update_next_hop_vsi}")
+                            self.logger(f"Patching route {route['id']} with data: {route_patch}")
+                            self._make_api_request(
+                                "PATCH",
+                                f"/v1/vpcs/{self.vpc_id}/routing_tables/{table_id}/routes/{route['id']}?version={self.API_VERSION}&generation=2",
+                                body=json.dumps(route_patch)
+                            )
+                            self.logger(f"Successfully updated route {route['id']} to use next hop {self.update_next_hop_vsi}")
 
             self.logger(f"Returning updated next hop: {self.update_next_hop_vsi}")
             return self.update_next_hop_vsi
@@ -285,7 +257,7 @@ class HAFailOver():
         """Get Token
 
         Returns:
-        string:Returning the acsess token
+            string: Returning the access token
 
         """
         if self.apikey is not None:
@@ -1223,7 +1195,7 @@ def fail_over_cr_vip (cmd , vpc_url, ext_ip_1 , ext_ip_2, api_key=""):
         cmd (string): SET or GET
         vpc_url (string): IBM cloud regional VPC URL
         ext_ip_1 (string): Ip of the first VSI
-        ext_ip_2 (string): Ip of teh secound VSI
+        ext_ip_2 (string): Ip of the second VSI
         apy_key  (string)
     Returns:
         _type_: _description_
